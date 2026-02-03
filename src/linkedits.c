@@ -34,7 +34,9 @@ static uintptr_t sHeadLookBlacklist[] = {
     0x0400E0E8,
     0x0400E0E0,
     0x0400DF30,
-    0x0400E0D8
+    0x0400E0D8,
+    0x0400D210,
+    0x0400D208
 };
 
 // Enemy blacklist (actors Link should NOT look at)
