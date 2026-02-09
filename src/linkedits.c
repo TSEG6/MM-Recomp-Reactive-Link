@@ -36,7 +36,16 @@ static uintptr_t sHeadLookBlacklist[] = {
     0x0400DF30,
     0x0400E0D8,
     0x0400D210,
-    0x0400D208
+    0x0400D208,
+    0x0400DDB8,
+    0x0400DDB0,
+    0x0400DB18,
+    0x0400D5B0,
+    0x0400D128,
+    0x0400D5A8,
+    0x0400CF98,
+    0x0400D0B0
+
 };
 
 // Enemy blacklist (actors Link should NOT look at)
@@ -68,7 +77,7 @@ static u16 gIgnoreNpcLookScenes[] = {
 
 // NPC blacklist
 static u16 gNpcBlacklist[] = {
-    164, 514, 469
+    164, 514, 469, 566
 };
 
 // Enemy rotation blacklist scenes
@@ -80,8 +89,6 @@ static u16 gEnemyHeadBlacklistScenes[] = {
     SCENE_HAKUGIN_BS
 };
 
-
-// This is probably overdone?
 
 static bool ShouldIgnoreNpcLook(u16 sceneId) {
     for (size_t i = 0; i < sizeof(gIgnoreNpcLookScenes) / sizeof(gIgnoreNpcLookScenes[0]); i++) {
@@ -155,6 +162,7 @@ static void BetterLink_UpdateTargetPosition(PlayState* play, Player* player) {
                 foundEnemy = false;
                 found = true;
             }
+            //recomp_printf("[NPC] Actor: %08X, id: %d, dist: %.2f\n", (uintptr_t)actor, actor->id, dist);
         }
     }
 
@@ -206,6 +214,12 @@ void BetterLink_ActorGetFocus(Actor* actor) {
 // Roll use cooldown
 RECOMP_HOOK("func_80840A30")
 void BetterLink_Roll(Actor* actor) {
+    sItemCooldown = 10;
+}
+
+// Ladder use cooldown
+RECOMP_HOOK("Player_Action_50")
+void BetterLink_Climb(Actor* actor) {
     sItemCooldown = 10;
 }
 
@@ -281,6 +295,7 @@ void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
             }
         }
 
+
         if (combatstance == 0.0f) {
             if (sCombatIdleCooldown == 0 && player->speedXZ == 0.0f && (sEnemyNearby || bossBgmPlaying)) {
                 bool canPlayCombatAnim = false;
@@ -332,5 +347,9 @@ void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
                 }
             }
         }
+        //recomp_printf("[Debug] speedXZ: %.2f, canLook: %d, skelAnim: %08X, cooldown: %d, item: %d \n",
+         //   player->speedXZ, canLook, (uintptr_t)player->skelAnime.animation, sCombatIdleCooldown, sItemCooldown);
+        //recomp_printf("[CombatIdle] Triggered | Speed %.3f | Enemy %d | Boss %d\n",
+        //   player->speedXZ, sEnemyNearby, bossBgmPlaying);
     }
 }
