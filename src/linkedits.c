@@ -279,12 +279,19 @@ void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
             diff.y = sLookPos.y - (player->actor.world.pos.y + 60.0f);
             diff.z = sLookPos.z - player->actor.world.pos.z;
 
-            sHeadYawTarget = (s16)((Math_Atan2S(diff.x, diff.z) - player->actor.shape.rot.y) * lookStrength);
-            sHeadPitchTarget = (s16)(Math_Atan2S(diff.y, sqrtf(diff.x * diff.x + diff.z * diff.z)) * lookStrength);
+            s16 targetYawWorld = Math_Atan2S(diff.x, diff.z);
+            s16 targetPitchWorld = Math_Atan2S(diff.y, sqrtf(diff.x * diff.x + diff.z * diff.z));
+
+            s16 yawDiff = targetYawWorld - player->actor.shape.rot.y;
+
+            if (yawDiff > 32767) yawDiff -= 65536;
+            if (yawDiff < -32768) yawDiff += 65536;
+
+            sHeadYawTarget = (s16)(yawDiff * lookStrength);
+            sHeadPitchTarget = (s16)(targetPitchWorld * lookStrength);
 
             Math_SmoothStepToS(&player->headLimbRot.y, sHeadYawTarget, 5, 0x600, 0);
             Math_SmoothStepToS(&player->headLimbRot.x, sHeadPitchTarget, 5, 0x600, 0);
-            Math_SmoothStepToS(&player->upperLimbRot.y, (s16)(sHeadYawTarget / 2), 5, 0x400, 0);
             if (sEnemyNearby) Math_SmoothStepToS(&player->upperLimbRot.y, (s16)(sHeadYawTarget * 3 / 4), 5, 0x600, 0);
         }
         else {
