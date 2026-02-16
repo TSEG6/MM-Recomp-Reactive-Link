@@ -25,38 +25,24 @@ static uintptr_t sAllowedBaseAnims[] = {
 
 // Rotation Blacklist for NPCs
 static uintptr_t sHeadLookBlacklist[] = {
-    0x0400DD28,
-    0x0400DF68,
-    0x0400E0B0,
-    0x0400DEE8,
-    0x0400E0B8,
-    0x0400E0F0,
-    0x0400E0E8,
-    0x0400E0E0,
-    0x0400DF30,
-    0x0400E0D8,
-    0x0400D210,
-    0x0400D208,
-    0x0400DDB8,
-    0x0400DDB0,
-    0x0400DB18,
-    0x0400D5B0,
-    0x0400D128,
-    0x0400D5A8,
-    0x0400CF98,
-    0x0400D0B0
+    0x0400DD28, 0x0400DF68, 0x0400E0B0,
+    0x0400DEE8, 0x0400E0B8, 0x0400E0F0,
+    0x0400E0E8, 0x0400E0E0, 0x0400DF30,
+    0x0400E0D8, 0x0400D210, 0x0400D208,
+    0x0400DDB8, 0x0400DDB0, 0x0400DB18,
+    0x0400D5B0, 0x0400D128, 0x0400D5A8,
+    0x0400CF98, 0x0400D0B0, 0x0400D4A0,
+    0x0400E270, 0x0400D498, 0x0400D4D8,
+    0x0400E2C0
 
 };
 
 // Enemy blacklist (actors Link should NOT look at)
 static u16 gEnemyLookBlacklist[] = {
     573, // Moths
-
 };
 
 // Config Preset
-static float gDefaultEnemyLookRange = 260.0f;
-static float gDefaultEnemyExitRange = 300.0f;
 static float gHighEnemyLookRange = 9999.0f;
 static float gHighEnemyExitRange = 9999.0f;
 
@@ -77,7 +63,7 @@ static u16 gIgnoreNpcLookScenes[] = {
 
 // NPC blacklist
 static u16 gNpcBlacklist[] = {
-    164, 514, 469, 566
+    164, 514, 469, 566, 632
 };
 
 // Enemy rotation blacklist scenes
@@ -88,7 +74,6 @@ static u16 gEnemyHeadBlacklistScenes[] = {
     SCENE_SEA_BS,
     SCENE_HAKUGIN_BS
 };
-
 
 static bool ShouldIgnoreNpcLook(u16 sceneId) {
     for (size_t i = 0; i < sizeof(gIgnoreNpcLookScenes) / sizeof(gIgnoreNpcLookScenes[0]); i++) {
@@ -118,9 +103,13 @@ static bool IsEnemyBlacklisted(u16 actorId) {
     return false;
 }
 
-
-
 static void BetterLink_UpdateTargetPosition(PlayState* play, Player* player) {
+
+    // Config values
+    double enemyLookRangeCfg = recomp_get_config_double("enemy_distance");
+    double npcLookRangeCfg = recomp_get_config_double("look_distance");
+    double enemyExitRangeCfg = enemyLookRangeCfg + 50.0;
+
     Vec3f nearestPos;
     float nearestDist = 999999.0f;
     bool foundEnemy = false;
@@ -136,8 +125,10 @@ static void BetterLink_UpdateTargetPosition(PlayState* play, Player* player) {
         }
     }
 
-    float enemyLookRange = bossBgmPlaying ? gHighEnemyLookRange : gDefaultEnemyLookRange;
-    float enemyExitRange = bossBgmPlaying ? gHighEnemyExitRange : gDefaultEnemyExitRange;
+    if (bossBgmPlaying) {
+        enemyLookRangeCfg = (double)gHighEnemyLookRange;
+        enemyExitRangeCfg = (double)gHighEnemyExitRange;
+    }
 
     bool ignoreNpcs = ShouldIgnoreNpcLook(play->sceneId);
 
@@ -147,22 +138,27 @@ static void BetterLink_UpdateTargetPosition(PlayState* play, Player* player) {
             if (!actor->update || IsNpcBlacklisted(actor->id)) continue;
 
             Vec3f targetPos;
-            targetPos.x = actor->world.pos.x;
-            targetPos.z = actor->world.pos.z;
-            targetPos.y = actor->world.pos.y + actor->shape.yOffset + 20.0f;
+            if (actor->focus.pos.x != 0 || actor->focus.pos.y != 0 || actor->focus.pos.z != 0) {
+                targetPos = actor->focus.pos;
+            }
+            else {
+                targetPos.x = actor->world.pos.x;
+                targetPos.y = actor->world.pos.y + (actor->colChkInfo.cylHeight ? actor->colChkInfo.cylHeight * 0.8f : actor->shape.yOffset + 20.0f);
+                targetPos.z = actor->world.pos.z;
+            }
 
             float dx = targetPos.x - player->actor.world.pos.x;
             float dy = targetPos.y - (player->actor.world.pos.y + 60.0f);
             float dz = targetPos.z - player->actor.world.pos.z;
             float dist = sqrtf(dx * dx + dy * dy + dz * dz);
 
-            if (dist < 160.0f && dist < nearestDist) {
+            if (dist < (float)npcLookRangeCfg && dist < nearestDist) {
                 nearestPos = targetPos;
                 nearestDist = dist;
                 foundEnemy = false;
                 found = true;
             }
-            //recomp_printf("[NPC] Actor: %08X, id: %d, dist: %.2f\n", (uintptr_t)actor, actor->id, dist);
+            recomp_printf("[NPC] Actor: %08X, id: %d, dist: %.2f\n", (uintptr_t)actor, actor->id, dist);
         }
     }
 
@@ -178,26 +174,26 @@ static void BetterLink_UpdateTargetPosition(PlayState* play, Player* player) {
             float dz = focus.z - player->actor.world.pos.z;
             float dist = sqrtf(dx * dx + dy * dy + dz * dz);
 
-            if (dist < enemyLookRange && dist < nearestDist) {
+            if (dist < enemyLookRangeCfg && dist < nearestDist) {
                 nearestPos = focus;
                 nearestDist = dist;
                 foundEnemy = true;
                 found = true;
+                // recomp_printf("[Look] Enemy ID %d at dist %.2f\n", actor->id, dist);
             }
         }
     }
 
     if (found) {
         sLookPos = nearestPos;
-        sCurrentLookRange = enemyLookRange;
-        sEnemyNearby = (!bossBgmPlaying) && foundEnemy && nearestDist < enemyExitRange;
+        sCurrentLookRange = (float)enemyLookRangeCfg;
+        sEnemyNearby = (!bossBgmPlaying) && foundEnemy && (double)nearestDist < enemyExitRangeCfg;
     }
     else {
         sCurrentLookRange = 0.0f;
         sEnemyNearby = false;
     }
 }
-
 
 // Sword Cooldown
 RECOMP_HOOK("Player_Action_84")
@@ -223,16 +219,18 @@ void BetterLink_Climb(Actor* actor) {
     sItemCooldown = 10;
 }
 
-// The Hook with all the logic pretty much
+// Main Player Update
 RECOMP_HOOK("Player_Update")
 void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
     if (play->csCtx.state != CS_STATE_IDLE) return;
 
+    // Update cooldowns
     if (sCombatIdleCooldown > 0) sCombatIdleCooldown--;
     if (sItemCooldown > 0) sItemCooldown--;
 
     s32 camSetting = play->cameraPtrs[0]->setting;
     bool canLook = true;
+
     if (camSetting == CAM_MODE_FIRSTPERSON ||
         camSetting == CAM_MODE_BOWARROWZ ||
         camSetting == CAM_MODE_BOWARROW ||
@@ -240,19 +238,30 @@ void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
         camSetting == CAM_MODE_BOOMERANG ||
         camSetting == CAM_MODE_ZORAFIN ||
         camSetting == CAM_MODE_ZORAFINZ ||
-        camSetting == CAM_MODE_CHARGE ||
-        camSetting == CAM_MODE_CLIMB ||
         camSetting == CAM_MODE_DEKUHIDE ||
         sItemCooldown > 0) {
         canLook = false;
-    } // I'm going to be honest I don't think this does anything lol
+    } // this DOES do something
 
     if (canLook) {
         BetterLink_UpdateTargetPosition(play, player);
 
-        // Head ROT
+        // Look configuration
+        double lookStrength = recomp_get_config_double("look_strength");
         bool canRotateHeadNpc = true;
-        double combatstance = recomp_get_config_double("battle_stance");
+        double battleStanceConfig = recomp_get_config_double("battle_stance");
+
+        // Check for boss BGM
+        u16 activeSeq = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
+        bool bossBgmPlaying = false;
+        for (size_t i = 0; i < sizeof(gBossBgmTracks) / sizeof(gBossBgmTracks[0]); i++) {
+            if (activeSeq == gBossBgmTracks[i]) {
+                bossBgmPlaying = true;
+                break;
+            }
+        }
+
+        // Head rotation blacklist
         for (size_t i = 0; i < sizeof(sHeadLookBlacklist) / sizeof(sHeadLookBlacklist[0]); i++) {
             if ((uintptr_t)player->skelAnime.animation == sHeadLookBlacklist[i]) {
                 canRotateHeadNpc = false;
@@ -261,42 +270,31 @@ void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
         }
 
         bool canRotateHeadEnemy = !ShouldIgnoreEnemyHead(play->sceneId);
+        bool canRotateHead = canRotateHeadNpc && (canRotateHeadEnemy || !sEnemyNearby);
 
-        bool canRotateHead = true;
-        if (!canRotateHeadNpc) canRotateHead = false;
-        if (!canRotateHeadEnemy && sEnemyNearby) canRotateHead = false;
-
+        // Rotate head towards target if allowed
         if (sCurrentLookRange > 0.0f && canRotateHead) {
             Vec3f diff;
             diff.x = sLookPos.x - player->actor.world.pos.x;
             diff.y = sLookPos.y - (player->actor.world.pos.y + 60.0f);
             diff.z = sLookPos.z - player->actor.world.pos.z;
 
-            sHeadYawTarget = Math_Atan2S(diff.x, diff.z) - player->actor.shape.rot.y;
-            sHeadPitchTarget = Math_Atan2S(diff.y, sqrtf(diff.x * diff.x + diff.z * diff.z));
+            sHeadYawTarget = (s16)((Math_Atan2S(diff.x, diff.z) - player->actor.shape.rot.y) * lookStrength);
+            sHeadPitchTarget = (s16)(Math_Atan2S(diff.y, sqrtf(diff.x * diff.x + diff.z * diff.z)) * lookStrength);
 
             Math_SmoothStepToS(&player->headLimbRot.y, sHeadYawTarget, 5, 0x600, 0);
             Math_SmoothStepToS(&player->headLimbRot.x, sHeadPitchTarget, 5, 0x600, 0);
-            Math_SmoothStepToS(&player->upperLimbRot.y, sHeadYawTarget / 2, 5, 0x400, 0);
-            if (sEnemyNearby) Math_SmoothStepToS(&player->upperLimbRot.y, sHeadYawTarget * 3 / 4, 5, 0x600, 0);
+            Math_SmoothStepToS(&player->upperLimbRot.y, (s16)(sHeadYawTarget / 2), 5, 0x400, 0);
+            if (sEnemyNearby) Math_SmoothStepToS(&player->upperLimbRot.y, (s16)(sHeadYawTarget * 3 / 4), 5, 0x600, 0);
         }
         else {
             sHeadYawTarget = 0;
             sHeadPitchTarget = 0;
         }
 
-        // Animation handling
-        bool bossBgmPlaying = false;
-        u16 activeSeq = AudioSeq_GetActiveSeqId(SEQ_PLAYER_BGM_MAIN);
-        for (size_t i = 0; i < sizeof(gBossBgmTracks) / sizeof(gBossBgmTracks[0]); i++) {
-            if (activeSeq == gBossBgmTracks[i]) {
-                bossBgmPlaying = true;
-                break;
-            }
-        }
+        // Combat idle animation logic
+        if (battleStanceConfig == 0.0f) {
 
-
-        if (combatstance == 0.0f) {
             if (sCombatIdleCooldown == 0 && player->speedXZ == 0.0f && (sEnemyNearby || bossBgmPlaying)) {
                 bool canPlayCombatAnim = false;
                 for (size_t i = 0; i < sizeof(sAllowedBaseAnims) / sizeof(sAllowedBaseAnims[0]); i++) {
@@ -315,31 +313,11 @@ void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
                 }
             }
             else {
+                
                 PlayerAnimationHeader* combatAnim = (PlayerAnimationHeader*)0x0400DF18;
                 if ((uintptr_t)player->skelAnime.animation == (uintptr_t)combatAnim) {
-                    if (sCombatIdleStopTimer > 0) {
-                        sCombatIdleStopTimer--;
-                    }
-                    else {
-
-                        if (player->speedXZ == 0.0f) {
-                            PlayerAnimationHeader* normalIdle = (PlayerAnimationHeader*)0x0400DF28;
-                            f32 endFrame = Animation_GetLastFrame(normalIdle);
-                            PlayerAnimation_Change(play, &player->skelAnime, normalIdle, 1.0f, 0.0f, endFrame, ANIMMODE_LOOP, 8.0f);
-                        }
-                    }
-                }
-            }
-        }
-        else {
-            PlayerAnimationHeader* combatAnim = (PlayerAnimationHeader*)0x0400DF18;
-            if ((uintptr_t)player->skelAnime.animation == (uintptr_t)combatAnim) {
-                if (sCombatIdleStopTimer > 0) {
-                    sCombatIdleStopTimer--;
-                }
-                else {
-
-                    if (player->speedXZ == 0.0f) {
+                    if (sCombatIdleStopTimer > 0) sCombatIdleStopTimer--;
+                    else if (player->speedXZ == 0.0f) {
                         PlayerAnimationHeader* normalIdle = (PlayerAnimationHeader*)0x0400DF28;
                         f32 endFrame = Animation_GetLastFrame(normalIdle);
                         PlayerAnimation_Change(play, &player->skelAnime, normalIdle, 1.0f, 0.0f, endFrame, ANIMMODE_LOOP, 8.0f);
@@ -347,9 +325,14 @@ void BetterLink_PlayerUpdate(Player* player, PlayState* play) {
                 }
             }
         }
-        //recomp_printf("[Debug] speedXZ: %.2f, canLook: %d, skelAnim: %08X, cooldown: %d, item: %d \n",
-         //   player->speedXZ, canLook, (uintptr_t)player->skelAnime.animation, sCombatIdleCooldown, sItemCooldown);
-        //recomp_printf("[CombatIdle] Triggered | Speed %.3f | Enemy %d | Boss %d\n",
-        //   player->speedXZ, sEnemyNearby, bossBgmPlaying);
+        else {
+            
+            PlayerAnimationHeader* combatAnim = (PlayerAnimationHeader*)0x0400DF18;
+            if ((uintptr_t)player->skelAnime.animation == (uintptr_t)combatAnim) {
+                PlayerAnimationHeader* normalIdle = (PlayerAnimationHeader*)0x0400DF28;
+                f32 endFrame = Animation_GetLastFrame(normalIdle);
+                PlayerAnimation_Change(play, &player->skelAnime, normalIdle, 1.0f, 0.0f, endFrame, ANIMMODE_LOOP, 8.0f);
+            }
+        }
     }
 }
