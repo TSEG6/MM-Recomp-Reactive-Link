@@ -8,14 +8,13 @@
 id = "mm_recomp_reactive_link"
 
 # Version of this mod.
-version = "1.1.0"
+version = "2.0.0"
 
 # The name that will show up for this mod in the mod menu. This should be human readable.
 display_name = "Reactive Link"
 
 # The description that will show up when this mod is displayed in the mod menu. This should be human readable.
-description =  """
-A mod that makes Link react more, similar to how he does in MM3D.
+description =  """A mod that makes Link react more, similar to how he does in MM3D.
 
 Link will get tense when near enemies and bosses and looks at NPC's and enemies."""
 
@@ -76,30 +75,6 @@ options = [ "True", "False" ]
 default = "True"
 
 [[manifest.config_options]]
-id = "enemy_distance"
-name = "Combat Distance"
-description = "How far away an enemy has to be for Link to tense up. (default 260)"
-type = "Number"
-min = 1
-max = 600
-step = 1
-precision = 1
-percent = false
-default = 260
-
-[[manifest.config_options]]
-id = "look_distance"
-name = "Look At Distance"
-description = "How far away an NPC has to be for Link to look at them. (default 160)"
-type = "Number"
-min = 1
-max = 600
-step = 1
-precision = 1
-percent = false
-default = 100
-
-[[manifest.config_options]]
 id = "look_strength"
 name = "Look Strength"
 description = "How much effort Link will put into looking at something."
@@ -109,4 +84,4 @@ max = 1
 step = 0.1
 precision = 1
 percent = false
-default = 0.5
+default = 1
